@@ -1,0 +1,11 @@
+{
+    "name" : "api-attendance developement",
+    "database" : {
+        "host" : "localhost",
+        "user" : "root",
+        "name" : "vps"
+    },
+    "aadhaar_authentication" : { 
+        "baseUrl" : "http://localhost:8000/api"
+    }
+}

@@ -1,0 +1,6 @@
+{
+    "name" : "api-mock-aadhaar-authentication developement",
+    "database" : {
+        "host" : "localhost"
+    }
+}

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+   <title></title>
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <link rel="stylesheet" type="text/css" href="style.css" />
+   <link rel="stylesheet" type="text/css" href="./css/ie9.css" />
+   <link rel="stylesheet" type="text/css" href="./css/signature-pad.css" />
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+      integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous" />
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+   <script src="../assets/library/node_modules/jwt-decode/build/jwt-decode.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+   <link rel="stylesheet" href="../assets/library/mprogress.min.css" />
+   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+   <script src=".././assets/library/node_modules/jwt-decode/build/jwt-decode.js"></script>
+   <script src="../assets/library/mprogress.min.js"></script>
+   <script src="../js/utils/progress.js"></script>
+   <script src="../js/utils/cache.js"></script>
+   <script src="../js/api/client.js"></script>
+   <script src="../js/utils/index.js"></script>
+   <script src="../js/index.js"></script>
+   <script src="../js/utils/cache.js"></script>
+   <script src="../js/utils/storage.js"></script>
+</head>
+
+<body>
+
+   <div class="container-fluid">
+      <div class="row">
+         <div class="col-sm-9">
+            <div class="row" id="fir">
+               <div id="paper">
+                  <div id="content">
+                     <div>
+                        <img style="float: right;" id="mic_image" src="./mic.png" width="40" height="40"
+                           onclick="startMic()" />
+                     </div>
+                     <br><br>
+                     <div>
+                        <h5 style="text-align: right" for="fir_number" id="fir_number">
+                           FIR NUMBER :
+                        </h5>
+                     </div>
+                     <div class="row" style="display: flex; flex-direction: column">
+                        <label id="to">To,</label>
+                        <label id="police">The Police Officer,</label>
+                        <label id="address"></label>
+                        <label id="date">Date : </label>
+                        <label id="Respected">Respected Sir,</label>
+                     </div>
+                     <div>
+                        <p id="result" contenteditable="true" onkeypress="changeText()" onfocusout="changeText()"
+                           onfocusin="changeText()" style="text-indent: 50px"></p>
+                        <br /><br /><br />
+                     </div>
+
+                     <div class="row" style="display: flex; justify-content: space-between">
+                        <div class="col-sm-3" style="display: flex; flex-direction: column">
+                        </div>
+                        <div class="col-sm-9" style="
+                                 display: flex;
+                                 flex-direction: column;
+                                 align-items: flex-end;
+                              ">
+                           <img src="" id="victim-sign" width="200" height="100" />
+                           <span>----------------------</span>
+                           <label id="user_id"></label>
+                           <label id="phone_no"></label>
+                           <label id="user_name"></label>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+         <div class="col-sm-3">
+            <div id="signature-pad" class="signature-pad">
+               <div class="signature-pad--body">
+                  <canvas id="signature" style="border-width: 1px; border-style: solid"></canvas>
+               </div>
+               <div class="signature-pad--footer">
+                  <div class="description" style="color: red; font-weight: bold">
+                     Sign above
+                  </div>
+
+                  <div class="signature-pad--actions"
+                     style="display: flex; flex-direction: row; align-items: center; justify-content: center;">
+                     <div class="row">
+                        <button type="button" class="button clear ml-2" data-action="clear">
+                           Clear
+                        </button>
+                        <button type="button" class="button save ml-2" onclick="imageclick()" id="cfm">
+                           confirm sign
+                        </button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+            <label for="msg"> Please choose any case related photos</label>
+            <input type="file" name="photos" id="photos"><br><br>
+            <br>
+            <label for="msg" class="msg"></label>
+            <center><button style="align-self: center;" onclick="submit()">Submit</button></center>
+         </div>
+      </div>
+   </div>
+</body>
+
+<script>
+   const fir_number = parseInt(Date.now() + Math.random() + Math.random());
+
+   async function submit() {
+      const complaint = getValue('complaint');
+      const user = await getUser();
+      const formData = new FormData();
+      const description = document.getElementById('result').innerText;
+      if (!description.length) return alert("Please enter the description of complaint.");
+      var mycanvas = document.getElementById("signature");
+      var image = mycanvas.toDataURL("image/png");
+      const blob = dataURItoBlob(image);
+
+      var files = $('#photos')[0].files;
+
+      console.log(complaint);
+
+      formData.append("fir_number", fir_number);
+      formData.append("police_station_number", complaint[2].value);
+      formData.append("description", description);
+      formData.append("user_id", user.id);
+      formData.append("place_of_crime", complaint[1].value);
+      formData.append("time_of_crime", complaint[0].value);
+      formData.append("victim_signature", blob, "signature.png");
+      for (var i = 0; i < files.length; i++) {
+         var file = files[i];
+         formData.append('photos', file);
+      }
+      const result = await post("/cctns/first-information-reports", formData, {
+         headers: {
+            'content-type': 'multipart/form-data'
+         }
+      });
+      const { statusText, response } = result;
+      console.log(response, statusText);
+      if (statusText != "Created") {
+         return error_set(0, response.data.description);
+      }
+      success_set(0, "Your FIR has been submitted.");
+   }
+
+   function dataURItoBlob(dataURI) {
+      var byteString;
+      if (dataURI.split(',')[0].indexOf('base64') >= 0)
+         byteString = atob(dataURI.split(',')[1]);
+      else
+         byteString = unescape(dataURI.split(',')[1]);
+
+      var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+      var ia = new Uint8Array(byteString.length);
+      for (var i = 0; i < byteString.length; i++) {
+         ia[i] = byteString.charCodeAt(i);
+      }
+
+      return new Blob([ia], { type: mimeString });
+   }
+</script>
+
+
+<script>
+   let finalTranscripts = '';
+   let isMicStart = false;
+   const speechRecognizer = new webkitSpeechRecognition();
+   function startMic() {
+      if ('webkitSpeechRecognition' in window) {
+         if (!isMicStart) {
+            toggleMicImage();
+            toggleMic();
+            speechRecognizer.continuous = true;
+            speechRecognizer.interimResults = true;
+            speechRecognizer.start();
+            console.log("started");
+            speechRecognizer.onresult = function (event) {
+               var interimTranscripts = '';
+               for (var i = event.resultIndex; i < event.results.length; i++) {
+                  var transcript = event.results[i][0].transcript;
+                  if (event.results[i].isFinal) finalTranscripts += transcript;
+                  else interimTranscripts += transcript;
+               }
+               document.getElementById('result').innerHTML = finalTranscripts + '<span style="color:grey">' + interimTranscripts + '</span>';
+            };
+         }
+         else {
+            toggleMicImage();
+            toggleMic();
+            speechRecognizer.stop();
+         }
+
+      }
+      else document.getElementById('result').innerHTML = "Your Browser does not support Speech Recognition.";
+
+   }
+
+   function changeText() {
+      const partialComplaint = document.getElementById('result').innerText;
+      finalTranscripts = partialComplaint;
+   }
+
+   function toggleMicImage() {
+      document.getElementById("mic_image").src = isMicStart ? "./mic.png" : "./mic.gif";
+   }
+
+   function toggleMic() {
+      isMicStart = !isMicStart;
+   }
+</script>
+
+<script type="text/javascript">
+   function renderComplaint() {
+      const complaint = getValue('complaint');
+      const policeStations = getValue('policeStations');
+      $('#address').append(getPoliceStationAddress(complaint[2].value));
+      $('#date').append(complaint[0].value);
+      $("#fir_number").append(fir_number);
+   }
+
+   async function renderUser() {
+      const user = await getUser();
+      $("#user_id").append(user.id);
+      $("#user_name").append(user.user_name);
+      $("#phone_no").append(user.phone_number);
+   }
+
+   renderUser();
+   renderComplaint();
+
+   function getPoliceStationAddress(policeStationNumber) {
+      const policeStations = getValue('policeStations');
+      const ps = policeStations.find(ps => ps.police_station_number == policeStationNumber);
+      return ps.police_station_address;
+   }
+
+</script>
+
+<script type="text/javascript">
+   var _gaq = _gaq || []
+   _gaq.push(["_setAccount", "UA-39365077-1"])
+   _gaq.push(["_trackPageview"])
+      ; (function () {
+         var ga = document.createElement("script")
+         ga.type = "text/javascript"
+         ga.async = true
+         ga.src =
+            ("https:" == document.location.protocol
+               ? "https://ssl"
+               : "http://www") + ".google-analytics.com/ga.js"
+         var s = document.getElementsByTagName("script")[0]
+         s.parentNode.insertBefore(ga, s)
+      })()
+</script>
+
+<script type="text/javascript">
+   function imageclick() {
+      var el = document.getElementById("result").offsetHeight / 25
+      if (el > 0) {
+         document.getElementById("victim-sign").style.display = "block"
+         var mycanvas = document.getElementById("signature") //get your canvas
+         var image = mycanvas.toDataURL("image/png") //Convert
+         document.getElementById("victim-sign").src = image
+      } else {
+         alert("please first register your complaint.")
+      }
+   }
+</script>
+
+<script src="js/signature_pad.umd.js"></script>
+<script src="js/app.js"></script>
+
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <title>Police Seva</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta charset="utf-8" />
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+   <link href="css/style.css" rel="stylesheet" type="text/css" media="all" />
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.2/jquery-confirm.min.css">
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.2/jquery-confirm.min.js"></script>
+   <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+   <link rel="stylesheet" href="assets/library/mprogress.min.css" />
+   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+   <script src="./assets/library/node_modules/jwt-decode/build/jwt-decode.js"></script>
+   <script src="assets/library/mprogress.min.js"></script>
+   <script src="js/utils/progress.js"></script>
+   <script src="js/utils/cache.js"></script>
+   <script src="js/api/client.js"></script>
+   <script src="js/utils/index.js"></script>
+   <script src="js/utils/storage.js"></script>
+   <script src="js/index.js"></script>
+
+   <script>
+      $(document).ready(function () {
+         let reqBody;
+         let is_register;
+         $("#login-form").on("submit", async function (e) {
+            e.preventDefault();
+            const formData = getFormData("#login-form");
+            number = formData[0].value;
+            is_register = formData[1] ? { is_register: true } : { is_register: false };
+            if (!formData.length || !determineUserId(number)) {
+               error_set(1, "Aadhaar or phone must be 10 or 12 charcter long respectively.");
+               return;
+            }
+            reqBody = determineUserId(number);
+            const { data, statusText } = await handleApiCall($(".input_des"), 1, post, "/otp", reqBody);
+            if (statusText == "Created") {
+               speak("Please enter otp", "Kripya otp daale.");
+               loader($(".input_des"), $(".otp_des"));
+               success_set(2, data.description);
+            }
+         });
+
+         $("#verify-form").on("submit", async function (e) {
+            e.preventDefault();
+            const formData = getFormData("#verify-form");
+            reqBody = { ...reqBody, otp: formData[0].value };
+            const result = await handleApiCall($(".otp_des"), 2, post, "/verification", reqBody);
+            if (result) {
+               const { data, statusText } = result;
+               if (statusText == "OK" && data.is_register) {
+                  storeToken(data.token);
+                  location.reload();
+               }
+
+               if (statusText == "OK" && !data.is_register && number.length == 10) {
+                  storeValue("registrationToken", data.token);
+                  loader($(".otp_des"), $(".detail_des2"));
+               }
+
+               if (statusText == "OK" && !data.is_register && number.length == 12) {
+                  storeValue("registrationToken", data.token);
+                  storeValue("tempUser", data.user);
+                  renderDetailDesign1(data.user);
+                  loader($(".otp_des"), $(".detail_des1"));
+               }
+            }
+
+         });
+
+         $("#registration-form1").on("click", async function () {
+            const user = await getValue("tempUser");
+            const reqBody = {
+               user_name: user.name,
+               aadhaar_number: user.aadhaar_number.toString(),
+               gender: user.gender,
+               address: user.address,
+               date_of_birth: user.dob
+            };
+            const result = await post("/users", reqBody, { headers: { 'x-auth-token': await getValue("registrationToken") } });
+            const { response, data: response_data, statusText } = result;
+            console.log(response);
+            if (!response_data) {
+               return error_set(3, response.data.description);
+            }
+            storeToken(response_data.token);
+            location.reload();
+
+         });
+
+         $("#registration-form2").on("submit", async function (e) {
+            e.preventDefault();
+            const formData = getFormData("#registration-form2");
+            const data = {
+               user_name: formData[0].value,
+               address: formData[1].value,
+               date_of_birth: formData[2].value,
+               gender: formData[3].value,
+               aadhaar_number: formData[4].value
+            }
+
+            const result = await post("/users", data, { headers: { 'x-auth-token': await getValue("registrationToken") } });
+            const { response, data: response_data, statusText } = result;
+            if (!response_data) {
+               return error_set(3, response.data.description);
+            }
+            storeToken(response_data.token);
+            location.reload();
+         });
+
+
+         $("#partial-complaint-form").on("submit", async function (e) {
+            e.preventDefault();
+            const formData = getFormData("#partial-complaint-form");
+            final_complaint(formData);
+         });
+
+         $("#logout-btn").click(function () {
+            removeToken();
+            removeValue('firs');
+            loader($(".profile_des"), $('.input_des'));
+         });
+
+         $("#new-complaint-btn").click(function () {
+            speak("Please enter following details", "Kripya nimnlikhit jaankaari daale.");
+            getLocation();
+            loader($('.profile_des'), $('.complaint_des'));
+         });
+
+         $("#language-select-btn").click(function () {
+            storeValue('language', selectedLanguage);
+            speak("Please enter your aadhaar or phone number", "Kripya apni aadhaar ya phone sankhya daale.");
+            loader($('.lang_des'), $('.input_des'));
+         });
+
+         function final_complaint(complaint) {
+            const result = confirm("Are You Sure You Want To Contiue \n Next You Will Get FIR Page \n Plase Enter All Incident Detail On FIR Page");
+            if (result) {
+               storeValue('complaint', complaint);
+               location.href = "./fir/index.html";
+            }
+         }
+
+         function renderDetailDesign1(user) {
+            $("#user_name").append(user.name);
+            $("#aadhaar_number").append(user.aadhaar_number);
+            $("#dob").append(user.dob);
+            $("#add").append(user.address);
+            $("#contact").append(user.phone_number);
+            $("#gender").append(user.gender);
+
+         }
+      });
+
+
+
+   </script>
+   <style>
+      * {
+         box-sizing: border-box;
+      }
+
+      .column {
+         float: left;
+         width: 50%;
+         height: 100%;
+      }
+
+      .row:after {
+         content: "";
+         display: table;
+         clear: both;
+      }
+
+      .signupform,
+      .agile-info {
+         padding: 50px;
+      }
+
+      @media screen and (max-width: 600px) {
+         .column {
+            width: 100%;
+            height: 70%;
+         }
+
+         .signupform,
+         .agile-info {
+            padding: 0;
+         }
+      }
+   </style>
+</head>
+
+<body onload="initialLoading()">
+   <div class="signupform">
+      <div class="row" style="border: 1px solid rgb(238, 237, 237); height: 500px">
+         <!-- vp image -->
+         <div class="column" style="
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  flex-direction: column;
+               ">
+            <img src="image/vp.png" style="width: 150px" alt="" />
+            <label style="font-size: 30px">Virtual Police Station</label>
+         </div>
+
+         <div class="column" style="
+                  background-color: azure;
+                  display: flex;
+                  justify-content: center;
+
+                  flex-direction: column;
+               ">
+            <!-- Language selection -->
+            <div class="lang_des" style="padding: 20px">
+               <div style="
+                        box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.5);
+                        padding: 20px;
+                     ">
+                  <h2 style="margin-left: 51px; font-size: 20px">
+                     Please Select Language
+                  </h2>
+                  <div style="
+                           display: flex;
+                           flex-direction: row;
+                           justify-content: space-around;
+                        ">
+                     <div class="input-group input_box lang" onclick="selectLanguage(this)" style="
+                              display: flex;
+                              justify-content: center;
+                              border-radius: 50%;
+                              align-items: center;
+                              width: 100px;
+                              height: 100px;
+                           ">
+                        <h4>ENGLISH</h4>
+                     </div>
+                     <div class="input-group input_box lang" onclick="selectLanguage(this)" style="
+                              display: flex;
+                              justify-content: center;
+                              border-radius: 50%;
+                              align-items: center;
+                              width: 100px;
+                              height: 100px;
+                           ">
+                        <h4>HINDI</h4>
+                     </div>
+                  </div>
+
+                  <label class="msg"></label>
+                  <br />
+                  <button class="btn btn-danger btn-block lang-next" id="language-select-btn"
+                     style="margin-top: 10px; margin-left: 51px">
+                     NEXT
+                  </button>
+               </div>
+            </div>
+
+            <!-- Login -->
+            <div class="input_des" style="padding: 40px">
+               <h2>Please Verify Your Aadhar Or Phone</h2>
+               <form action="" id="login-form">
+                  <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                     <img style="width: 30px; height: 25px; margin-top: 10px" src="image/aadhar.png" alt="" />
+                     <input type="text" id="input_data" placeholder="Enter Your Aadhaar Number Or Phone"
+                        name="user-id" />
+                     <i style="margin-top: 15px; color: red; display: none" class="fa fa-exclamation-triangle"></i>
+                  </div>
+                  <label class="msg"></label><br>
+
+
+                  <button class="btn btn-danger btn-block submit" type="submit" style="margin-top: 10px">
+                     Submit
+                  </button>
+               </form>
+            </div>
+
+            <!-- verify otp -->
+            <div class="w3_info otp_des" style="padding: 40px">
+               <h2>Please Verify OTP</h2>
+               <form action="" id="verify-form">
+                  <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                     <img style="width: 30px; height: 25px; margin-top: 10px" src="image/aadhar.png" alt="" />
+                     <input type="text" id="otp" name="otp" placeholder="Enter OTP" />
+                     <i style="margin-top: 15px; color: red; display: none" class="fa fa-exclamation"></i>
+                  </div>
+
+                  <label class="msg"></label>
+                  <br />
+                  <button class="btn btn-danger btn-block verify" style="margin-top: 10px" type="submit">
+                     Verify
+                  </button>
+               </form>
+            </div>
+
+            <!-- if phone number choosed -->
+            <div style="display: flex; flex-direction: column;" class="detail_des2">
+               <div style="display: flex; flex-direction: column">
+                  <form action="" id="registration-form2">
+                     <h2>Please Fill Your Details</h2>
+                     <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                        <input type="text" id="username" name="username" placeholder="Enter Name" />
+                     </div>
+                     <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                        <input type="text" id="useraddress" name="address" placeholder="Enter Address" />
+                     </div>
+                     <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                        <input type="text" id="userdob" name="dob" placeholder="Enter D.O.B" />
+                     </div>
+                     <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                        <input type="text" id="usergender" name="gender" placeholder="Enter Gender" />
+                     </div>
+
+                     <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                        <input type="text" id="aadhaar" name="aadhaar" placeholder="Enter aadhaar number" />
+                     </div>
+
+                     <label class="msg"></label><br>
+
+                     <button style="width: 130px" class="btn btn-danger btn-block phone_next" type="submit">
+                        NEXT
+                     </button>
+                  </form>
+               </div>
+            </div>
+
+
+            <!-- details of aadhaar -->
+            <div style="display: flex; flex-direction: column" class="detail_des1">
+               <div style="display: flex; flex-direction: column; margin-top: 10px;">
+                  <img src="image/icon.png" id="aadhar_img" />
+                  <h4 id="user_name">Name : </h4>
+                  <br />
+                  <h4 id="aadhaar_number">Aadhaar number :</h4>
+                  <br />
+                  <h4 id="dob">DOB : </h4>
+                  <br />
+                  <h4 id="add">Address :</h4>
+                  <br />
+                  <h4 id="contact">Contact : </h4>
+                  <br />
+                  <h4 id="gender">Gender :</h4>
+                  <br />
+
+                  <label for="msg" id="msg"></label>
+
+                  <button style="width: 130px" class="btn btn-danger btn-block aadhaar_next" id="registration-form1"
+                     type="submit">
+                     NEXT
+                  </button>
+               </div>
+            </div>
+
+
+            <!-- Home page after login -->
+            <div style="
+                     display: flex;
+                     flex-direction: column;
+                     padding: 4px;
+                     box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.5);
+                  " class="profile_des">
+               <div style="
+                        display: flex;
+                        flex-direction: row;
+                        justify-content: space-between;
+                        background-color: #7d520e;
+                        padding: 10px;
+                        border-radius: 4px;
+                     ">
+                  <img src="Image/icon.png" id="aadhar_img" style="width: 30px; height: 30px" />
+                  <h2 style="
+                           margin-top: 20px;
+                           margin-right: 100px;
+                           color: white;
+                        " id="loggedinname"></h2>
+                  <div class="tooltip" id="logout-btn" style="cursor : pointer">
+                     <i style="font-size: 30px; color: white" class="fa fa-sign-out"></i>
+                  </div>
+               </div>
+
+               <div>
+                  <table>
+                     <thead>
+                        <tr>
+                           <th>FIR No</th>
+                           <th>Status</th>
+                           <th>Complaint</th>
+                        </tr>
+                     </thead>
+                     <tbody id="my-complaint">
+                     </tbody>
+                  </table>
+               </div>
+               <div style="
+                        padding: 20px;
+                        display: flex;
+                        justify-content: flex-end;
+                     " class="complaintdiv">
+                  <div class="tooltip" id="new-complaint-btn" style="
+                           background-color: #7d520e;
+                           height: 40px;
+                           width: 40px;
+                           border-radius: 50%;
+                           display: flex;
+                           justify-content: center;
+                           align-items: center;
+                           box-shadow: 5px 5px 4px rgba(0, 0, 0, 0.5);
+                        ">
+                     <i class="fa fa-plus" style="color: white; font-size: 25px"></i>
+                  </div>
+               </div>
+            </div>
+
+            <!-- partial complaint -->
+            <div class="complaint_des">
+               <h2>Please Enter Following Details</h2>
+               <br />
+               <form action="" id="partial-complaint-form">
+
+                  <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                     <input type="text" id="when" onfocus="speak('Enter time of crime', 'apraadh ka samay daale.')"
+                        placeholder="Enter Time Of Crime" name="when" />
+                     <i class="fa fa-pencil" onclick="edit(this)"
+                        style="color: red; font-size: 25px; margin-top: 8px"></i>
+                  </div>
+                  <div class="input-group input_box" style="display: flex; flex: 1; flex-direction: row">
+                     <input type="text" id="where" onfocus="speak('Enter place of crime', 'apraadh ka asthaan daale.')"
+                        placeholder="Enter Place Of Crime" name="where" />
+                     <i class="fa fa-pencil" onclick="edit(this)"
+                        style="color: red; font-size: 25px; margin-top: 8px"></i>
+                  </div>
+
+                  <div style="display: flex; flex: 1; flex-direction: row">
+                     <select id="myPoliceStation" onfocus="speak('Select police station.', 'Police station choone.')"
+                        name="police_station" style="
+                           width: 99%;
+                           padding: 15px 15px;
+                           outline: none;
+                           border: 1px solid #dddddd;
+                           font-family: 'Raleway', sans-serif;
+                           font-size: 15px;
+                           color: #333;
+                        ">
+                        <option>Nearest Police Station</option>
+                     </select>
+                  </div>
+
+                  <div style="
+                        display: flex;
+                        align-items: flex-end;
+                        justify-content: flex-end;
+                     ">
+                     <button class="btn btn-danger btn-block" type="submit" style="margin-top: 25px">
+                        NEXT
+                     </button>
+                  </div>
+               </form>
+
+            </div>
+
+
+         </div>
+      </div>
+   </div>
+</body>
+
+</html>

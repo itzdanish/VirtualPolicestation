@@ -1,0 +1,11 @@
+{
+    "name" : "api-attendance production",
+    "database" : {
+        "host" : "",
+        "user" : "",
+        "name" : ""
+    },
+    "aadhaar_authentication" : { 
+        "baseUrl" : "http://localhost:8000/api"
+    }
+}

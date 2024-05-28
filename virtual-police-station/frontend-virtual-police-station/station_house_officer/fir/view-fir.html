@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/simple-query-string@1.3.2/src/simplequerystring.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+        integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous" />
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <script src="../../js/utils/cache.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="../../assets/library/node_modules/jwt-decode/build/jwt-decode.js"></script>
+    <script src="../../js/api/client.js"></script>
+    <script src="../../js/utils/storage.js"></script>
+
+</head>
+
+<body>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="row" id="fir">
+                    <div id="paper">
+                        <div id="content">
+                            <h6 style="text-align: right" for="fir_number" id="fir_number">
+                                FIR NUMBER :
+                            </h6>
+                            <div class="row" style="display: flex; flex-direction: column">
+                                <label id="to">To,</label>
+                                <label>The Police Officer,</label>
+                                <label id="ploice_station_name"></label>
+                                <label id="address"></label>
+                                <label id="date">Date - </label>
+                                <label id="Respected">Respected Sir,</label>
+                            </div>
+                            <div>
+                                <p id="complaint" style="text-indent: 50px">
+
+                                </p><br /><br /><br />
+                            </div>
+
+                            <div class="row" style="display: flex; justify-content: space-between">
+                                <div class="col-sm-3" style="display: flex; flex-direction: column">
+                                    <img src="" id="soh-sign" width="200" height="100" />
+                                    <span>----------------------</span>
+                                    <label>(S.H.O)</label>
+                                </div>
+                                <div class="col-sm-9" style="
+                                  display: flex;
+                                  flex-direction: column;
+                                  align-items: flex-end;
+                               ">
+                                    <img src="" id="victim-sign" width="200" height="100" />
+                                    <span>----------------------</span>
+                                    <label id="user_id"></label>
+                                    <label id="phone_no"></label>
+                                    <label id="user_name"></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <h3>Case Photos</h3>
+                    <div class="container-fluid">
+                        <div class="row" style="display: flex; flex-direction: row;" id="uploaded_by_victim">
+                        </div>
+                    </div>
+                </div>
+
+
+                <br>
+                <center>
+                    <button type="button" onclick="printPdf()" id="btnPrint"
+                        style="font-size: large; width: 100px;">Print</button>
+                </center>
+            </div>
+
+        </div>
+    </div>
+</body>
+
+<script>
+
+    $(window).ready(async function () {
+        const { fir_number } = simpleQueryString.parse(location.search);
+        const fir = await getFir(fir_number);
+        loadFir(fir);
+    });
+
+    async function getFir(firNumber) {
+        const user = await getUser();
+
+        const { data: fir } = await get(`station-house-officer/${user.aadhaar_number}/first-information-reports/${firNumber}`);
+        return fir;
+    }
+
+    function loadFir(fir) {
+        $("#police_station_name").append(fir.police_station_name);
+        $("#address").append(fir.police_station_address);
+        $("#date").append(fir.time_of_crime);
+        $("#fir_number").append(fir.fir_number);
+        $("#user_id").append(fir.user_id);
+        $("#user_name").append(fir.name);
+        $("#phone_no").append(fir.phone_number);
+        $("#complaint").append(fir.description);
+        $("#victim-sign").attr("src", `http://localhost:3000/fir/signatures/${fir.fir_number}/${fir.signatures[0]}`);
+        $("#soh-sign").attr("src", `http://localhost:3000/fir/signatures/${fir.fir_number}/${fir.signatures[1]}`);
+        fir.upload_by_victim.forEach(image => {
+            $('#uploaded_by_victim').append(`
+            <div class="col-sm-4">
+                <img height="300" width="300" src="http://localhost:3000/fir/uploaded_by_victim/${fir.fir_number}/${image}" alt="">
+            </div>
+            `);
+
+        });
+
+    }
+
+    function printPdf() {
+        var win = window.open('', 'print', 'height=auto,width=auto');
+        win.document.write(document.getElementById("fir").innerHTML);
+        win.document.close();
+        win.focus();
+        win.print();
+    }
+
+</script>
+
+</html>
